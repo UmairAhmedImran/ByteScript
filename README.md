@@ -1,3 +1,3 @@
 # ByteScript
 
-Constructing a compiler in c#
+Lexical Analysis of a compiler in c#

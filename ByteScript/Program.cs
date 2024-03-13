@@ -17,7 +17,7 @@ namespace ByteScript
                 var lexer = new Lexer(line);
                 while (true)
                 {
-                    var token = lexer.NextToken();
+                    var token = lexer.Lex();
                     if (token.Kind == SyntaxKind.EndOfFileToken)
                         break;
                     Console.Write($"{token.Kind}: '{token.Text}'");
@@ -67,10 +67,14 @@ namespace ByteScript
     {
         private readonly string _text;
         private int _position;
+        private List<string> _diagnostics => _diagnostics;
+
         public Lexer(string text)
         {
             _text = text;
         }
+
+        public IEnumerable<string> Diagnostics => _diagnostics;
 
         private char Current
         {
@@ -88,7 +92,7 @@ namespace ByteScript
             _position++;
         }
 
-        public SyntaxToken NextToken()
+        public SyntaxToken Lex()
         {
 
             if (_position >= _text.Length)
@@ -103,7 +107,8 @@ namespace ByteScript
 
                 var length = _position - start;
                 var text = _text.Substring(start, length);
-                int.TryParse(text, out var value);
+                if (!int.TryParse(text, out var value))
+                    _diagnostics.Add($"The number {_text} isn't a valid Int32.");
                 return new SyntaxToken(SyntaxKind.NumberToken, start, text, value);
 
             }
@@ -120,20 +125,26 @@ namespace ByteScript
                 return new SyntaxToken(SyntaxKind.WhitespaceToken, start, text, null);
             }
 
-            if (Current == '+')
-                return new SyntaxToken(SyntaxKind.PlusToken, _position++, "+", null);
-            else if (Current == '-')
-                return new SyntaxToken(SyntaxKind.MinusToken, _position++, "-", null);
-            else if (Current == '*')
-                return new SyntaxToken(SyntaxKind.MultiplyToken, _position++, "*", null);
-            else if (Current == '/')
-                return new SyntaxToken(SyntaxKind.DivideToken, _position++, "/", null);
-            else if (Current == '(')
-                return new SyntaxToken(SyntaxKind.OpenParenthesisToken, _position++, "(", null);
-            else if (Current == ')')
-                return new SyntaxToken(SyntaxKind.CloseParenthesisToken, _position++, ")", null);
+            switch (Current)
+            {
 
+                case '+':
+                    return new SyntaxToken(SyntaxKind.PlusToken, _position++, "+", null);
+                case '-':
+                    return new SyntaxToken(SyntaxKind.MinusToken, _position++, "-", null);
+                case '*':
+                    return new SyntaxToken(SyntaxKind.MultiplyToken, _position++, "*", null);
+                case '/':
+                    return new SyntaxToken(SyntaxKind.DivideToken, _position++, "/", null);
+                case '(':
+                    return new SyntaxToken(SyntaxKind.OpenParenthesisToken, _position++, "(", null);
+                case ')':
+                    return new SyntaxToken(SyntaxKind.CloseParenthesisToken, _position++, ")", null);
+            }
+
+            _diagnostics.Add($"ERROR: bad character input: '{Current}'");
             return new SyntaxToken(SyntaxKind.BadToken, _position++, _text.Substring(_position - 1, 1), null);
+
 
         }
     }

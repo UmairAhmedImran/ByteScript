@@ -1,4 +1,6 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 namespace ByteScript
 {
@@ -32,6 +34,7 @@ namespace ByteScript
 
     }
 
+
     enum SyntaxKind
     {
         NumberToken,
@@ -49,10 +52,24 @@ namespace ByteScript
         PipePipeToken,
         EqualsEqualsToken,
         BangEqualToken,
-        BangToken
-
+        BangToken,
+        EqualsToken,
+        BreakKeyword,
+        ContinueKeyword,
+        ElseKeyword,
+        FalseKeyword,
+        ForKeyword,
+        IfKeyword,
+        LetKeyword,
+        TrueKeyword,
+        VarKeyword,
+        WhileKeyword,
+        IdentifierToken,
+        StringToken
 
     }
+
+
     class SyntaxToken
     {
         public SyntaxToken(SyntaxKind kind, int position, string text, object value)
@@ -70,7 +87,7 @@ namespace ByteScript
 
     }
 
-    class Lexer
+    internal sealed class Lexer
     {
         private readonly string _text;
         private int _position;
@@ -106,24 +123,27 @@ namespace ByteScript
             if (_position >= _text.Length)
                 return new SyntaxToken(SyntaxKind.EndOfFileToken, _position, "\0", null);
 
+            var start = _position;
+
             if (char.IsDigit(Current))
             {
-                var start = _position;
 
                 while (char.IsDigit(Current))
                     Next();
 
-                var length = _position - start;
-                var text = _text.Substring(start, length);
-                if (!int.TryParse(text, out var value))
-                    Console.WriteLine($"The number {_text} isn't a valid Int32.");
-                return new SyntaxToken(SyntaxKind.NumberToken, start, text, value);
-
+                if (char.IsWhiteSpace(Current) || _position >= _text.Length)
+                {
+                    var length = _position - start;
+                    var text = _text.Substring(start, length);
+                    if (!int.TryParse(text, out var value))
+                        Console.WriteLine($"The number {_text} isn't a valid Int32.");
+                    return new SyntaxToken(SyntaxKind.NumberToken, start, text, value);
+                }
             }
 
             if (char.IsWhiteSpace(Current))
             {
-                var start = _position;
+
 
                 while (char.IsWhiteSpace(Current))
                     Next();
@@ -133,17 +153,6 @@ namespace ByteScript
                 return new SyntaxToken(SyntaxKind.WhitespaceToken, start, text, null);
             }
 
-            if (char.IsLetter(Current))
-            {
-                var start = _position;
-
-                while (char.IsLetter(Current))
-                    Next();
-
-                var length = _position - start;
-                var text = _text.Substring(start, length);
-                return new SyntaxToken(SyntaxKind.LetterToken, start, text, null);
-            }
 
             switch (Current)
             {
@@ -162,26 +171,100 @@ namespace ByteScript
                     return new SyntaxToken(SyntaxKind.CloseParenthesisToken, _position++, ")", null);
                 case '&':
                     if (Lookahead == '&')
-                        return new SyntaxToken(SyntaxKind.AmperandAmpersandToken, _position += 2, "&&", null);
+                    {
+                        _position += 2;
+                        return new SyntaxToken(SyntaxKind.AmperandAmpersandToken, start, "&&", null);
+                    }
                     break;
+
                 case '|':
                     if (Lookahead == '|')
-                        return new SyntaxToken(SyntaxKind.PipePipeToken, _position += 2, "||", null);
+                    {
+                        _position += 2;
+                        return new SyntaxToken(SyntaxKind.PipePipeToken, start, "||", null);
+                    }
                     break;
                 case '=':
                     if (Lookahead == '=')
-                        return new SyntaxToken(SyntaxKind.EqualsEqualsToken, _position += 2, "==", null);
-                    break;
+                    {
+                        _position += 2;
+                        return new SyntaxToken(SyntaxKind.EqualsEqualsToken, start, "==", null);
+                    }
+                    else
+                    {
+                        _position += 1;
+                        return new SyntaxToken(SyntaxKind.BangToken, start, "!", null);
+                    }
                 case '!':
                     if (Lookahead == '=')
-                        return new SyntaxToken(SyntaxKind.BangEqualToken, _position += 2, "!=", null);
+                    {
+                        _position += 2;
+                        return new SyntaxToken(SyntaxKind.EqualsToken, start, "=", null);
+                    }
                     else
-                        return new SyntaxToken(SyntaxKind.BangToken, _position += 2, "!", null);
+                    {
+                        _position += 1;
+                        return new SyntaxToken(SyntaxKind.BangToken, start, "!", null);
+                    }
+            }
+            if (Current == '"')
+            {
+                _position++;
+                while (Current != '"')
+                {
+                    _position++;
+                    var length = _position - start;
+                    var text = _text.Substring(start + 1, length - 1);
+                    if (Current == '"')
+                    {
+
+                        return new SyntaxToken(SyntaxKind.StringToken, start, text, null);
+                    }
+                    else if (Current == '\n')
+                    {
+                        return new SyntaxToken(SyntaxKind.BadToken, _position++, _text.Substring(_position - 1, 1), null);
+                    }
+                }
+
+
+            }
+            if (char.IsLetter(Current) || Current == '_')
+            {
+                _position++;
+                while (char.IsLetterOrDigit(Current) || Current == '_')
+                    _position++;
+                var length = _position - start;
+                var text = _text.Substring(start, length);
+                switch (text)
+                {
+                    case "break":
+                        return new SyntaxToken(SyntaxKind.BreakKeyword, start, text, null);
+                    case "continue":
+                        return new SyntaxToken(SyntaxKind.ContinueKeyword, start, text, null);
+                    case "else":
+                        return new SyntaxToken(SyntaxKind.ElseKeyword, start, text, null);
+                    case "false":
+                        return new SyntaxToken(SyntaxKind.FalseKeyword, start, text, null);
+                    case "for":
+                        return new SyntaxToken(SyntaxKind.ForKeyword, start, text, null);
+                    case "if":
+                        return new SyntaxToken(SyntaxKind.IfKeyword, start, text, null);
+                    case "let":
+                        return new SyntaxToken(SyntaxKind.LetKeyword, start, text, null);
+                    case "true":
+                        return new SyntaxToken(SyntaxKind.TrueKeyword, start, text, null);
+                    case "var":
+                        return new SyntaxToken(SyntaxKind.VarKeyword, start, text, null);
+                    case "while":
+                        return new SyntaxToken(SyntaxKind.WhileKeyword, start, text, null);
+
+                    default:
+                        return new SyntaxToken(SyntaxKind.IdentifierToken, start, text, null);
+                }
 
             }
             return new SyntaxToken(SyntaxKind.BadToken, _position++, _text.Substring(_position - 1, 1), null);
-
-
         }
     }
+
 }
